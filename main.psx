@@ -1,0 +1,91 @@
+# ==========================================
+# PSX LANGUAGE - COMPLETE TEST SUITE
+# ==========================================
+
+print "--- 1. UJI VARIABEL & MATEMATIKA ---"
+a = 10
+b = 3
+tambah = a + b
+kurang = a - b
+kali = a * b
+bagi = a / b
+sisa = a % b
+pangkat = 2 ^ 3
+akar = sqrt(16)
+
+print "A:", a, "| B:", b
+print "Tambah:", tambah, "| Sisa Bagi (10%3):", sisa
+print "Pangkat (2^3):", pangkat, "| Akar (sqrt 16):", akar
+print "Hasil Kompleks (10+5)*2:", (10 + 5) * 2
+
+print " "
+print "--- 2. UJI STRING & BOOLEAN ---"
+nama = "Gemini"
+pesan = "Halo " + nama
+print "Gabung String:", pesan
+
+status_aktif = true
+print "Status Boolean:", status_aktif
+
+print " "
+print "--- 3. UJI LOGIKA (IF-ELSE) ---"
+skor = 85
+
+# Test IF Tunggal
+if skor > 70;
+    print "Hasil IF: Skor di atas 70 (LULUS)"
+
+# Test IF-ELSE
+if skor < 50;
+    print "Hasil IF: Ini tidak boleh muncul"
+else;
+    print "Hasil ELSE: Skor tidak di bawah 50 (SUKSES)"
+
+# Test Perbandingan Lain
+if skor == 85;
+    print "Hasil ==: Skor tepat 85"
+
+if skor != 100;
+    print "Hasil !=: Skor bukan 100"
+
+print " "
+print "--- 4. UJI ERROR HANDLING (TRY-CATCH) ---"
+
+# Menguji Error Matematika (Pembagian Nol)
+print "Mencoba pembagian nol..."
+try;
+    error_math = 10 / 0
+catch(MATH_ERROR);
+    print "Caught: Terdeteksi pembagian nol!"
+
+# Menguji Error Input (User memasukkan huruf pada tipe number)
+print " "
+print "UJI INPUT ERROR (Instruksi: Masukkan HURUF saat diminta angka)"
+try;
+    umur = number(input "Masukkan umur anda (angka): ")
+    print "Umur anda:", umur
+catch(INPUT_ERROR);
+    print "Caught: Anda tidak memasukkan angka yang valid!"
+
+# Catch Umum (Jika ada error lain)
+try;
+    # Baris ini hanya simulasi jika try kosong atau sukses
+    print "Try sukses, catch di bawah ini harusnya dilewati."
+catch;
+    print "Ini tidak boleh muncul jika tidak ada error"
+
+print " "
+print "--- 5. UJI STRICT TYPING & TYPE LOCKING ---"
+print "Variabel 'angka_kunci' akan dikunci sebagai DECIMAL."
+angka_kunci = decimal(input "Masukkan angka desimal (contoh 12.5): ")
+print "Nilai awal:", angka_kunci
+
+print "Mencoba isi ulang 'angka_kunci' dengan input baru..."
+# Jika kamu memasukkan teks, status_terakhir akan menjadi PSX_ERR_INPUT
+angka_kunci = decimal(input "Masukkan lagi (angka saja): ")
+print "Nilai akhir:", angka_kunci
+
+print " "
+print "=========================================="
+print "      SELURUH PENGUJIAN SELESAI"
+print "=========================================="

@@ -1,0 +1,74 @@
+func tambah(a, b);
+    return a + b
+
+func kurang(a, b);
+    return a - b
+
+func kali(a, b);
+    return a * b 
+
+func bagi(a, b);
+    if b == 0;
+        return 0
+    else;
+        return a / b 
+
+func pangkat(a, b);
+    return a ^ b 
+
+func akar(a);
+    return sqrt(a)
+
+func kalkulator();
+    print "\n==== KALKULATOR LENGKAP PSX ====\n"
+    print "1. Tambah  2. Kurang  3. Kali"
+    print "4. Bagi    5. Pangkat 6. Akar"
+    
+    try;
+        m = number(input "Pilih mode (1-6): ")
+    catch(INPUT_ERROR);
+        print "Input salah! Gunakan angka."
+        repeat;
+
+    if m == 1;
+        x = number(input "Angka 1: "); y = number(input "Angka 2: ")
+        hasil = call tambah(x, y)
+        print "Hasil Penjumlahan:", hasil
+
+    elif m == 2;
+        x = number(input "Angka 1: "); y = number(input "Angka 2: ")
+        hasil = call kurang(x, y)
+        print "Hasil Pengurangan:", hasil
+
+    elif m == 3;
+        x = number(input "Angka 1: "); y = number(input "Angka 2: ")
+        hasil = call kali(x, y)
+        print "Hasil Perkalian:", hasil
+
+    elif m == 4;
+        x = number(input "Angka 1: "); y = number(input "Angka 2: ")
+        if y == 0;
+            print "Error: Tidak bisa bagi nol!"
+        else;
+            hasil = call bagi(x, y)
+            print "Hasil Pembagian:", hasil
+
+    elif m == 5;
+        print "--- Perpangkatan ---"
+        x = number(input "Angka Dasar: ")
+        y = number(input "Pangkat: ")
+        hasil = call pangkat(x, y)
+        print "Hasil", x, "pangkat", y, "adalah:", hasil
+
+    elif m == 6;
+        print "--- Akar Kuadrat ---"
+        x = number(input "Masukkan Angka: ")
+        hasil = call akar(x)
+        print "Akar dari", x, "adalah:", hasil
+
+    else;
+        print "Pilihan 1-6 saja!"
+        repeat;
+
+# Jalankan program
+call kalkulator()
