@@ -31,22 +31,26 @@ func kalkulator();
         repeat;
 
     if m == 1;
-        x = number(input "Angka 1: "); y = number(input "Angka 2: ")
+        x = number(input "Angka 1: ")
+        y = number(input "Angka 2: ")
         hasil = call tambah(x, y)
         print "Hasil Penjumlahan:", hasil
 
     elif m == 2;
-        x = number(input "Angka 1: "); y = number(input "Angka 2: ")
+        x = number(input "Angka 1: ")
+        y = number(input "Angka 2: ")
         hasil = call kurang(x, y)
         print "Hasil Pengurangan:", hasil
 
     elif m == 3;
-        x = number(input "Angka 1: "); y = number(input "Angka 2: ")
+        x = number(input "Angka 1: ")
+        y = number(input "Angka 2: ")
         hasil = call kali(x, y)
         print "Hasil Perkalian:", hasil
 
     elif m == 4;
-        x = number(input "Angka 1: "); y = number(input "Angka 2: ")
+        x = number(input "Angka 1: ")
+        y = number(input "Angka 2: ")
         if y == 0;
             print "Error: Tidak bisa bagi nol!"
         else;

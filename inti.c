@@ -17,7 +17,7 @@ typedef struct {
     } data;
 } Value;
 
-// --- OPTIMASI 1: STRUKTUR HASH MAP UNTUK VARIABEL ---
+// --- HASH MAP UNTUK VARIABEL ---
 #define HASH_SIZE 256
 typedef struct VarNode {
     char nama[64]; 
@@ -57,9 +57,9 @@ int top_loop = -1;
 
 // --- VARIABEL GLOBAL UNTUK RETURN ---
 int psx_return_flag = 0;
-int rantai_if_terpenuhi = 0;
+int rantai_if_terpenuhi = 0;  // Untuk if-elif-else
 
-// --- 2. FUNGSI MEMORI (DIOPTIMASI DENGAN HASH TABLE) ---
+// --- 2. FUNGSI HASH ---
 unsigned int hash_func(char *str) {
     unsigned int hash = 5381;
     int c;
@@ -73,8 +73,12 @@ void psx_set_var(char *nama, Value new_val) {
 
     while (node != NULL) {
         if (strcmp(node->nama, nama) == 0) {
+            // Bebaskan memori lama jika perlu
             if (node->val.type == T_TEXT && node->val.data.s_val != NULL) {
-                free(node->val.data.s_val);
+                // Hanya bebaskan jika pointer berbeda (nilai baru bukan duplikat)
+                if (new_val.type == T_TEXT && node->val.data.s_val != new_val.data.s_val) {
+                    free(node->val.data.s_val);
+                }
             }
             node->val = new_val;
             return;
@@ -82,6 +86,7 @@ void psx_set_var(char *nama, Value new_val) {
         node = node->next;
     }
 
+    // Buat node baru
     VarNode *new_node = malloc(sizeof(VarNode));
     strncpy(new_node->nama, nama, 63);
     new_node->nama[63] = '\0';
@@ -126,7 +131,11 @@ double evaluasi_faktor(char **str) {
         }
         nama_var[i] = '\0';
         Value *v = psx_get_var(nama_var);
-        if (v) return (v->type == T_DECIMAL) ? v->data.f_val : (double)v->data.i_val;
+        if (v) {
+            if (v->type == T_DECIMAL) return v->data.f_val;
+            if (v->type == T_NUMBER) return (double)v->data.i_val;
+            if (v->type == T_BOOL) return (double)v->data.b_val;
+        }
         return 0;
     }
     *str = end;
@@ -135,10 +144,13 @@ double evaluasi_faktor(char **str) {
 
 double evaluasi_pangkat(char **str) {
     double n = evaluasi_faktor(str);
-    while (isspace(**str)) (*str)++;
-    if (**str == '^') {
+    while (1) {
+        while (isspace(**str)) (*str)++;
+        if (**str != '^') break;
         (*str)++;
-        n = pow(n, evaluasi_pangkat(str));
+        while (isspace(**str)) (*str)++;
+        double eksponen = evaluasi_faktor(str); // gunakan faktor, bukan pangkat (agar asosiatif kiri)
+        n = pow(n, eksponen);
     }
     return n;
 }
@@ -154,7 +166,16 @@ double evaluasi_perkalian(char **str) {
             if (n2 != 0) n = n / n2;
             else { status_terakhir = PSX_ERR_MATH; n = 0; }
         }
-        else if (op == '%') n = (double)((int)n % (int)n2);
+        else if (op == '%') {
+            int pembilang = (int)n;
+            int penyebut = (int)n2;
+            if (penyebut == 0) {
+                status_terakhir = PSX_ERR_MATH;
+                n = 0;
+            } else {
+                n = (double)(pembilang % penyebut);
+            }
+        }
     }
     return n;
 }
@@ -185,7 +206,7 @@ void proses_print(char *argumen) {
                 for (int i = 0; pesan[i] != '\0'; i++) {
                     if (pesan[i] == '\\' && pesan[i+1] == 'n') {
                         printf("\n");
-                        i++; // Lewati karakter 'n'
+                        i++;
                     } else {
                         putchar(pesan[i]);
                     }
@@ -213,15 +234,10 @@ void proses_print(char *argumen) {
 void proses_input_strict(char *nama_var, char *pesan, VarType target_type) {
     char buffer[1024];
     
-    // Tampilkan pesan prompt
     printf("%s", pesan);
     fflush(stdout); 
 
-    // PERBAIKAN \n YANG TERTINGGAL
     if (!fgets(buffer, sizeof(buffer), stdin)) return;
-    if (buffer[0] == '\n' || buffer[0] == '\r') {
-        if (!fgets(buffer, sizeof(buffer), stdin)) return;
-    }
 
     buffer[strcspn(buffer, "\r\n")] = 0; 
     
@@ -257,34 +273,56 @@ void proses_input_strict(char *nama_var, char *pesan, VarType target_type) {
     }
 }
 
-// OPTIMASI: Evaluasi kondisi yang lebih presisi
+// Evaluasi kondisi dengan dukungan ekspresi di kedua sisi
 int evaluasi_kondisi(char *kondisi) {
-    char nama_var[64], op[3];
-    double nilai_pembanding;
-    if (sscanf(kondisi, " %63s %2s %lf", nama_var, op, &nilai_pembanding) == 3) {
-        Value *v = psx_get_var(nama_var);
-        if (!v) return 0;
-        double val_asli;
-        if (v->type == T_DECIMAL) val_asli = v->data.f_val;
-        else if (v->type == T_NUMBER) val_asli = (double)v->data.i_val;
-        else if (v->type == T_BOOL) val_asli = (double)v->data.b_val;
-        else return 0;
-
-        if (op[0] == '<') {
-            if (op[1] == '=') return val_asli <= nilai_pembanding;
-            return val_asli < nilai_pembanding;
-        }
-        if (op[0] == '>') {
-            if (op[1] == '=') return val_asli >= nilai_pembanding;
-            return val_asli > nilai_pembanding;
-        }
-        if (strcmp(op, "==") == 0) return fabs(val_asli - nilai_pembanding) < 1e-9;
-        if (strcmp(op, "!=") == 0) return fabs(val_asli - nilai_pembanding) > 1e-9;
-    }
+    char *ptr = kondisi;
+    double kiri = evaluasi_ekspresi(&ptr);
+    while (isspace(*ptr)) ptr++;
+    
+    char op[3] = {0};
+    if (strncmp(ptr, "<=", 2) == 0) { strcpy(op, "<="); ptr += 2; }
+    else if (strncmp(ptr, ">=", 2) == 0) { strcpy(op, ">="); ptr += 2; }
+    else if (strncmp(ptr, "==", 2) == 0) { strcpy(op, "=="); ptr += 2; }
+    else if (strncmp(ptr, "!=", 2) == 0) { strcpy(op, "!="); ptr += 2; }
+    else if (*ptr == '<') { op[0] = '<'; ptr++; }
+    else if (*ptr == '>') { op[0] = '>'; ptr++; }
+    else return 0; // Tidak ada operator
+    
+    while (isspace(*ptr)) ptr++;
+    double kanan = evaluasi_ekspresi(&ptr);
+    
+    if (strcmp(op, "<") == 0) return kiri < kanan;
+    if (strcmp(op, "<=") == 0) return kiri <= kanan;
+    if (strcmp(op, ">") == 0) return kiri > kanan;
+    if (strcmp(op, ">=") == 0) return kiri >= kanan;
+    if (strcmp(op, "==") == 0) return fabs(kiri - kanan) < 1e-9;
+    if (strcmp(op, "!=") == 0) return fabs(kiri - kanan) > 1e-9;
     return 0;
 }
 
-// --- 4. INTERPRETER ---
+// --- 4. FUNGSI BANTU INDENTASI ---
+int hitung_indentasi(char *s) {
+    int indent = 0;
+    int i = 0;
+    while (s[i] == ' ' || s[i] == '\t') {
+        if (s[i] == ' ') indent++;
+        else if (s[i] == '\t') indent += 4;
+        i++;
+    }
+    return indent;
+}
+
+// Mencari baris berikutnya yang bukan komentar/kosong
+int next_nonempty_line(int start, int total, char baris[][512], int indent[]) {
+    for (int j = start + 1; j < total; j++) {
+        char *p = baris[j];
+        while (isspace(*p)) p++;
+        if (*p != '\0' && *p != '#') return j;
+    }
+    return -1;
+}
+
+// --- 5. INTERPRETER PERINTAH ---
 void eksekusi_psx(char *baris) {
     while (isspace((unsigned char)*baris)) baris++;
     if (*baris == 0 || *baris == '#') return;
@@ -359,29 +397,7 @@ void eksekusi_psx(char *baris) {
     }
 }
 
-// PERBAIKAN PENGHITUNGAN TAB DAN SPASI
-int hitung_indentasi(char *s) {
-    int indent = 0;
-    int i = 0;
-    while (s[i] == ' ' || s[i] == '\t') {
-        if (s[i] == ' ') indent++;
-        else if (s[i] == '\t') indent += 4; 
-        i++;
-    }
-    // Abaikan baris kosong dan komentar
-    if (s[i] == '\n' || s[i] == '\r' || s[i] == '\0' || s[i] == '#') {
-        return 999; 
-    }
-    return indent;
-}
-
-int get_next_real_indent(int start_i, int total_baris, int *indent_baris) {
-    for (int j = start_i + 1; j < total_baris; j++) {
-        if (indent_baris[j] != 999) return indent_baris[j];
-    }
-    return -1;
-}
-
+// --- 6. MAIN ---
 int main(int argc, char *argv[]) {
     if (argc < 2) { printf("Gunakan: psx <file.psx>\n"); return 1; }
     FILE *file = fopen(argv[1], "r");
@@ -417,12 +433,13 @@ int main(int argc, char *argv[]) {
                 daftar_fungsi[total_fungsi].indent_level = indent_saat_ini;
                 total_fungsi++;
                 i++;
+                // Lewati badan fungsi (indentasi lebih dalam)
                 while (i < total_baris && indent_baris[i] > indent_saat_ini) i++;
             }
             continue;
         }
 
-        // --- LOGIKA CALL ---
+        // --- CALL FUNCTION ---
         char *p_call = strstr(txt, "call ");
         if (p_call != NULL) {
             char var_tujuan[64] = "";
@@ -453,7 +470,6 @@ int main(int argc, char *argv[]) {
                         strcpy(param_copy, daftar_fungsi[f].parameter);
                         strcpy(arg_copy, arg_f);
 
-                        // PERBAIKAN SPASI DI PARAMETER
                         char *p_tok = strtok(param_copy, ", ");
                         char *a_tok = strtok(arg_copy, ", ");
 
@@ -479,21 +495,31 @@ int main(int argc, char *argv[]) {
         if (strncmp(txt, "while ", 6) == 0) {
             char kondisi[128];
             sscanf(txt + 6, "%127[^;]", kondisi); 
-            if (evaluasi_kondisi(kondisi)) { stack_loop[++top_loop] = i; i++; }
-            else { i++; while (i < total_baris && indent_baris[i] > indent_saat_ini) i++; }
+            if (evaluasi_kondisi(kondisi)) { 
+                stack_loop[++top_loop] = i; 
+                i++; 
+            } else { 
+                i++; 
+                // Lewati badan while
+                while (i < total_baris && indent_baris[i] > indent_saat_ini) i++; 
+            }
             continue;
         }
 
-        int indent_next = get_next_real_indent(i, total_baris, indent_baris);
+        int next_indent = -1;
+        int next_line = next_nonempty_line(i, total_baris, daftar_baris, indent_baris);
+        if (next_line != -1) next_indent = indent_baris[next_line];
         
-        if (top_loop >= 0 && indent_next <= indent_baris[stack_loop[top_loop]] && indent_next != -1) {
+        // Cek akhir while
+        if (top_loop >= 0 && next_indent != -1 && next_indent <= indent_baris[stack_loop[top_loop]]) {
             eksekusi_psx(daftar_baris[i]);
             if (psx_return_flag) goto handle_return;
             i = stack_loop[top_loop--]; 
             continue;
         }
 
-        if (top_panggil >= 0 && indent_next <= daftar_fungsi[top_panggil].indent_level && indent_next != -1) {
+        // Cek akhir fungsi
+        if (top_panggil >= 0 && next_indent != -1 && next_indent <= daftar_fungsi[top_panggil].indent_level) {
             eksekusi_psx(daftar_baris[i]); 
             if (psx_return_flag) goto handle_return;
 
@@ -506,46 +532,76 @@ int main(int argc, char *argv[]) {
             continue;
         }
 
-        // --- KODE PERBAIKAN UNTUK BLOK IF-ELIF-ELSE ---
+        // --- IF-ELIF-ELSE (state machine sederhana) ---
+        static int if_skip_mode = 0;       // 1 = lewati blok
+        static int if_condition_met = 0;   // apakah kondisi if/elif sudah terpenuhi
+
         if (strncmp(txt, "if ", 3) == 0) {
             char kondisi[128];
             sscanf(txt + 3, "%127[^;]", kondisi);
-            rantai_if_terpenuhi = evaluasi_kondisi(kondisi);
-            
-            if (rantai_if_terpenuhi) {
-                i++; 
-            } else {
+            if (if_skip_mode) {
+                // Jika sedang dalam mode skip, lewati blok ini
                 i++;
                 while (i < total_baris && indent_baris[i] > indent_saat_ini) i++;
+            } else {
+                int terpenuhi = evaluasi_kondisi(kondisi);
+                if (terpenuhi) {
+                    if_condition_met = 1;
+                    i++;  // masuk blok
+                } else {
+                    if_condition_met = 0;
+                    i++;
+                    while (i < total_baris && indent_baris[i] > indent_saat_ini) i++;
+                }
             }
             continue;
-        } 
+        }
         else if (strncmp(txt, "elif ", 5) == 0) {
-            if (rantai_if_terpenuhi) {
+            if (if_skip_mode) {
                 i++;
                 while (i < total_baris && indent_baris[i] > indent_saat_ini) i++;
             } else {
-                char kondisi[128];
-                sscanf(txt + 5, "%127[^;]", kondisi);
-                rantai_if_terpenuhi = evaluasi_kondisi(kondisi);
-                if (rantai_if_terpenuhi) i++;
-                else { i++; while (i < total_baris && indent_baris[i] > indent_saat_ini) i++; }
+                if (if_condition_met) {
+                    // Kondisi sebelumnya sudah terpenuhi, lewati elif ini
+                    i++;
+                    while (i < total_baris && indent_baris[i] > indent_saat_ini) i++;
+                } else {
+                    char kondisi[128];
+                    sscanf(txt + 5, "%127[^;]", kondisi);
+                    int terpenuhi = evaluasi_kondisi(kondisi);
+                    if (terpenuhi) {
+                        if_condition_met = 1;
+                        i++;
+                    } else {
+                        i++;
+                        while (i < total_baris && indent_baris[i] > indent_saat_ini) i++;
+                    }
+                }
             }
             continue;
         }
         else if (strncmp(txt, "else;", 5) == 0) {
-            if (rantai_if_terpenuhi) { i++; while (i < total_baris && indent_baris[i] > indent_saat_ini) i++; }
-            else { i++; }
+            if (if_skip_mode) {
+                i++;
+                while (i < total_baris && indent_baris[i] > indent_saat_ini) i++;
+            } else {
+                if (!if_condition_met) {
+                    i++;  // masuk blok else
+                } else {
+                    i++;
+                    while (i < total_baris && indent_baris[i] > indent_saat_ini) i++;
+                }
+            }
             continue;
         }
 
-        // RESET FLAG IF (Berdiri Sendiri, tidak memblokir eksekusi di bawahnya)
-        if (i < total_baris && indent_baris[i] <= indent_saat_ini && 
-            strncmp(txt, "elif", 4) != 0 && strncmp(txt, "else", 4) != 0) {
-            rantai_if_terpenuhi = 0; 
+        // Reset mode if ketika keluar dari blok (indentasi kembali ke level awal)
+        if (next_indent != -1 && next_indent <= indent_saat_ini) {
+            if_skip_mode = 0;
+            if_condition_met = 0;
         }
-        
-        // --- BLOK TRY (Perbaikan Infinite Loop) ---
+
+        // --- TRY-CATCH ---
         if (strncmp(txt, "try", 3) == 0) {
             indeks_try = i; 
             int indent_induk = indent_baris[i];
@@ -565,6 +621,7 @@ int main(int argc, char *argv[]) {
             if (psx_return_flag) goto handle_return; 
 
             if (status_terakhir != PSX_OK) {
+                // Cari catch
                 while (i < total_baris) {
                     char *txt_catch = daftar_baris[i];
                     while (isspace((unsigned char)*txt_catch)) txt_catch++;
@@ -593,11 +650,13 @@ int main(int argc, char *argv[]) {
                     i++;
                 }
             } else {
+                // Tidak ada error, lewati blok catch
                 while (i < total_baris) {
                     char *txt_next = daftar_baris[i];
                     while (isspace((unsigned char)*txt_next)) txt_next++;
                     if (indent_baris[i] == indent_induk && strncmp(txt_next, "catch", 5) == 0) {
-                        i++; while (i < total_baris && indent_baris[i] > indent_induk) i++;
+                        i++; 
+                        while (i < total_baris && indent_baris[i] > indent_induk) i++;
                     } else break;
                 }
             }
@@ -622,10 +681,11 @@ int main(int argc, char *argv[]) {
                 psx_return_flag = 0;
                 continue;
             }
-            i++; // Penting agar tidak nge-blank!
+            i++;
         }
     }
 
+    // Bersihkan memori
     for (int j = 0; j < HASH_SIZE; j++) {
         VarNode *node = kamus_hash[j];
         while (node != NULL) {
