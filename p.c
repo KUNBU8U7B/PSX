@@ -1,0 +1,4 @@
+use psx
+
+print "Hello, PSX World!","Welcome to the PSX Compiler!","This is a test of the PSX Compiler's print functionality.","Enjoy coding with PSX!","Goodbye, PSX World!"
+!compile
