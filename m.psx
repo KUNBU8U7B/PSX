@@ -42,3 +42,4 @@ print "End of Test Cases, have a nice day!","PSX is awesome! :) use psx for more
 # ---------------------------------------------------------
 # 5. KOMPILASI KE BINER
 # ---------------------------------------------------------
+!compile

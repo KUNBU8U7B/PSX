@@ -12,6 +12,15 @@ std::string trim(const std::string& str) {
     return str.substr(first, (last - first + 1));
 }
 
+PSXType detectType(std::string val) {
+    if (val.empty()) return TYPE_UNKNOWN;
+    if (val.front() == '"' && val.back() == '"') return TYPE_TEXT;
+    if (val.front() == '\'' && val.back() == '\'' && val.length() >= 3) return TYPE_CHAR;
+    if (val == "true" || val == "false") return TYPE_BOOL;
+    if (val.find('.') != std::string::npos) return TYPE_DECIMAL;
+    return TYPE_NUMBER;
+}
+
 class Interpreter {
 private:
     std::map<std::string, Variable> symbolTable; // Penyimpanan variabel
@@ -21,9 +30,15 @@ private:
         std::vector<std::string> segments;
         std::string current;
         bool inQuotes = false;
+        int inParens = 0; // LOGIKA BARU: Penghitung tanda kurung
+
         for (char c : content) {
             if (c == '"') inQuotes = !inQuotes;
-            if (c == ',' && !inQuotes) {
+            else if (c == '(' && !inQuotes) inParens++;
+            else if (c == ')' && !inQuotes) inParens--;
+
+            // Potong berdasarkan koma HANYA JIKA tidak di dalam kutipan DAN tidak di dalam kurung
+            if (c == ',' && !inQuotes && inParens == 0) {
                 segments.push_back(trim(current));
                 current = "";
             } else {
@@ -55,12 +70,12 @@ public:
             while (std::getline(ss, v, ',')) symbolTable[trim(v)] = {type, ""};
         }
         // 2. Deklarasi Python-style (contoh: x = 10)
-        else if (line.find("=") != std::string::npos && line.substr(0, 5) != "print") {
+        else if (line.find("=") != std::string::npos && (line.length() < 5 || line.substr(0, 5) != "print")) {
             size_t pos = line.find("=");
             std::string varName = trim(line.substr(0, pos));
             std::string val = trim(line.substr(pos + 1));
             
-            PSXType type = (val[0] == '"') ? TYPE_TEXT : TYPE_NUMBER;
+            PSXType type = detectType(val); // Gunakan fungsi deteksi pintar
             symbolTable[varName] = {type, val};
         }
         // 3. Print Gabungan
@@ -71,25 +86,47 @@ public:
             for (std::string& seg : segments) {
                 if (seg.empty()) continue;
 
-                // Cek jika Literal String "..."
-                if (seg[0] == '"' && seg.back() == '"') {
+                // 1. Cek syntax Label(tipe, variabel)
+                if (seg.length() > 7 && seg.substr(0, 6) == "Label(" && seg.back() == ')') {
+                    size_t commaPos = seg.find(',');
+                    if (commaPos != std::string::npos) {
+                        std::string targetType = trim(seg.substr(6, commaPos - 6));
+                        std::string varName = trim(seg.substr(commaPos + 1, seg.length() - commaPos - 2));
+
+                        if (symbolTable.count(varName)) {
+                            Variable var = symbolTable[varName];
+                            bool match = false;
+                            if (targetType == "text" && var.type == TYPE_TEXT) match = true;
+                            else if (targetType == "number" && var.type == TYPE_NUMBER) match = true;
+                            else if (targetType == "decimal" && var.type == TYPE_DECIMAL) match = true;
+                            else if (targetType == "bool" && var.type == TYPE_BOOL) match = true;
+                            else if (targetType == "char" && var.type == TYPE_CHAR) match = true;
+
+                            if (match) {
+                                std::cout << "[" << targetType << ": " << (var.value.front() == '"' ? var.value.substr(1, var.value.length()-2) : var.value) << "]";
+                            } else {
+                                std::cout << "[TypeError: '" << varName << "' bukan " << targetType << "]";
+                            }
+                        } else {
+                            std::cout << "[Error: Variabel '" << varName << "' tidak ditemukan]";
+                        }
+                    }
+                }
+                // 2. Cek jika Literal String "..."
+                else if (seg.front() == '"' && seg.back() == '"') {
                     std::cout << seg.substr(1, seg.length() - 2);
                 }
-                // Cek jika Keyword Tipe Data
-                else if (seg == "text" || seg == "number" || seg == "decimal" || seg == "bool" || seg == "char") {
-                    std::cout << seg;
-                }
-                // Cek jika itu Variabel yang sudah terdaftar
+                // 3. Cek jika itu Variabel biasa (tanpa label)
                 else if (symbolTable.count(seg)) {
                     std::string val = symbolTable[seg].value;
-                    if (!val.empty() && val[0] == '"') std::cout << val.substr(1, val.length() - 2);
+                    if (!val.empty() && val.front() == '"') std::cout << val.substr(1, val.length() - 2);
                     else std::cout << val;
                 }
-                // Jika hanya angka/teks biasa
+                // 4. Teks/angka biasa
                 else {
                     std::cout << seg;
                 }
-                std::cout << " "; // Spasi antar segmen
+                std::cout << " ";
             }
             std::cout << std::endl;
         }

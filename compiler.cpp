@@ -24,9 +24,15 @@ std::vector<std::string> splitSegments(std::string content) {
     std::vector<std::string> segments;
     std::string current;
     bool inQuotes = false;
+    int inParens = 0; // LOGIKA BARU: Penghitung tanda kurung
+
     for (char c : content) {
         if (c == '"') inQuotes = !inQuotes;
-        if (c == ',' && !inQuotes) {
+        else if (c == '(' && !inQuotes) inParens++;
+        else if (c == ')' && !inQuotes) inParens--;
+
+        // Potong berdasarkan koma HANYA JIKA tidak di dalam kutipan DAN tidak di dalam kurung
+        if (c == ',' && !inQuotes && inParens == 0) {
             segments.push_back(trim(current));
             current = "";
         } else {
@@ -66,7 +72,7 @@ void buildNativeBinary(std::string filename, const std::vector<std::string>& cod
             size_t pos = l.find("=");
             std::string varName = trim(l.substr(0, pos));
             std::string val = trim(l.substr(pos + 1));
-            PSXType type = (val[0] == '"') ? TYPE_TEXT : TYPE_NUMBER;
+            PSXType type = detectType(val); // Gunakan fungsi deteksi pintar
             buildTable[varName] = {type, val};
         }
         // C. Logika Print Gabungan (Baru)
@@ -78,21 +84,42 @@ void buildNativeBinary(std::string filename, const std::vector<std::string>& cod
                 if (seg.empty()) continue;
                 std::string textToPrint = "";
 
-                // 1. Cek jika Literal String "..."
-                if (seg[0] == '"' && seg.back() == '"') {
+                // 1. Cek syntax Label(tipe, variabel)
+                if (seg.length() > 7 && seg.substr(0, 6) == "Label(" && seg.back() == ')') {
+                    size_t commaPos = seg.find(',');
+                    if (commaPos != std::string::npos) {
+                        std::string targetType = trim(seg.substr(6, commaPos - 6));
+                        std::string varName = trim(seg.substr(commaPos + 1, seg.length() - commaPos - 2));
+
+                        if (buildTable.count(varName)) {
+                            Variable var = buildTable[varName];
+                            bool match = (targetType == "text" && var.type == TYPE_TEXT) ||
+                                         (targetType == "number" && var.type == TYPE_NUMBER) ||
+                                         (targetType == "decimal" && var.type == TYPE_DECIMAL) ||
+                                         (targetType == "bool" && var.type == TYPE_BOOL) ||
+                                         (targetType == "char" && var.type == TYPE_CHAR);
+
+                            if (match) {
+                                textToPrint = "[" + targetType + ": " + (var.value.front() == '"' ? var.value.substr(1, var.value.length()-2) : var.value) + "] ";
+                            } else {
+                                textToPrint = "[TypeError: '" + varName + "' bukan " + targetType + "] ";
+                            }
+                        } else {
+                            textToPrint = "[Error: Variabel tidak ditemukan] ";
+                        }
+                    }
+                }
+                // 2. Cek jika Literal String "..."
+                else if (seg.front() == '"' && seg.back() == '"') {
                     textToPrint = seg.substr(1, seg.length() - 2) + " ";
                 }
-                // 2. Cek jika Keyword Tipe Data
-                else if (seg == "text" || seg == "number" || seg == "decimal" || seg == "bool" || seg == "char") {
-                    textToPrint = seg + " ";
-                }
-                // 3. Cek jika itu Variabel
+                // 3. Cek jika itu Variabel biasa (tanpa label)
                 else if (buildTable.count(seg)) {
                     std::string val = buildTable[seg].value;
-                    if (!val.empty() && val[0] == '"') textToPrint = val.substr(1, val.length() - 2) + " ";
+                    if (!val.empty() && val.front() == '"') textToPrint = val.substr(1, val.length() - 2) + " ";
                     else textToPrint = (val.empty() ? "null" : val) + " ";
                 }
-                // 4. Jika teks biasa/angka langsung
+                // 4. Teks biasa/angka
                 else {
                     textToPrint = seg + " ";
                 }

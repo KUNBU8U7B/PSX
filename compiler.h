@@ -13,6 +13,7 @@ struct Variable {
 };
 
 std::string trim(const std::string& str);
+PSXType detectType(std::string val);
 void buildNativeBinary(std::string filename, const std::vector<std::string>& codeLines, bool includeEasterEgg);
 
 #endif
