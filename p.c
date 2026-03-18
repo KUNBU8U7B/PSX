@@ -42,4 +42,22 @@ print "End of Test Cases, have a nice day!","PSX is awesome! :) use psx for more
 # ---------------------------------------------------------
 # 5. KOMPILASI KE BINER
 # ---------------------------------------------------------
+
+# 1. Deklarasi Otomatis (Python-style)
+z1 = 3+5j
+kosong = none
+
+# 2. Deklarasi Manual (C++ style)
+complex:: z2
+z2 = 10-2j
+
+print "--- UJI COBA TAHAP 1 ---"
+print "Nilai z1: ", Label(complex, z1)
+print "Nilai z2: ", Label(complex, z2)
+print "Data Kosong: ", Label(null, kosong)
+
+print ""
+print "--- UJI TYPE ERROR ---"
+print "Tes Error: ", Label(number, z1)
+
 !compile
