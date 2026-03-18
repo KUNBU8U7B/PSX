@@ -12,11 +12,17 @@ std::string trim(const std::string& str) {
     return str.substr(first, (last - first + 1));
 }
 
+// HAPUS FUNGSI detectType LAMA DAN GANTI MENJADI INI:
 PSXType detectType(std::string val) {
-    if (val.empty()) return TYPE_UNKNOWN;
+    if (val.empty() || val == "none") return TYPE_NULL; // Deteksi Null
     if (val.front() == '"' && val.back() == '"') return TYPE_TEXT;
     if (val.front() == '\'' && val.back() == '\'' && val.length() >= 3) return TYPE_CHAR;
     if (val == "true" || val == "false") return TYPE_BOOL;
+    
+    // Deteksi Complex: ada 'j' dan ada operator '+' atau '-'
+    if (val.find('j') != std::string::npos && (val.find('+') != std::string::npos || val.find('-') != std::string::npos)) 
+        return TYPE_COMPLEX;
+        
     if (val.find('.') != std::string::npos) return TYPE_DECIMAL;
     return TYPE_NUMBER;
 }
@@ -60,9 +66,12 @@ public:
             std::string typeStr = trim(line.substr(0, pos));
             std::string vars = line.substr(pos + 2);
             
+            // HAPUS KODE LAMA DAN GANTI MENJADI INI:
             PSXType type = (typeStr == "text") ? TYPE_TEXT : 
                            (typeStr == "number") ? TYPE_NUMBER : 
                            (typeStr == "decimal") ? TYPE_DECIMAL :
+                           (typeStr == "complex") ? TYPE_COMPLEX : 
+                           (typeStr == "null") ? TYPE_NULL : 
                            (typeStr == "bool") ? TYPE_BOOL : TYPE_CHAR;
 
             std::stringstream ss(vars);
@@ -95,12 +104,15 @@ public:
 
                         if (symbolTable.count(varName)) {
                             Variable var = symbolTable[varName];
+                            // HAPUS BAGIAN CEK if (match) LAMA DAN GANTI INI:
                             bool match = false;
                             if (targetType == "text" && var.type == TYPE_TEXT) match = true;
                             else if (targetType == "number" && var.type == TYPE_NUMBER) match = true;
                             else if (targetType == "decimal" && var.type == TYPE_DECIMAL) match = true;
                             else if (targetType == "bool" && var.type == TYPE_BOOL) match = true;
                             else if (targetType == "char" && var.type == TYPE_CHAR) match = true;
+                            else if (targetType == "complex" && var.type == TYPE_COMPLEX) match = true; // Tambahan
+                            else if (targetType == "null" && var.type == TYPE_NULL) match = true;       // Tambahan
 
                             if (match) {
                                 std::cout << "[" << targetType << ": " << (var.value.front() == '"' ? var.value.substr(1, var.value.length()-2) : var.value) << "]";

@@ -5,8 +5,7 @@
 #include <string>
 #include <map>
 
-enum PSXType { TYPE_TEXT, TYPE_NUMBER, TYPE_DECIMAL, TYPE_BOOL, TYPE_CHAR, TYPE_UNKNOWN };
-
+enum PSXType { TYPE_TEXT, TYPE_NUMBER, TYPE_DECIMAL, TYPE_BOOL, TYPE_CHAR, TYPE_COMPLEX, TYPE_NULL, TYPE_UNKNOWN };
 struct Variable {
     PSXType type;
     std::string value;

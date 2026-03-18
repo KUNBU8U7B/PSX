@@ -62,7 +62,10 @@ void buildNativeBinary(std::string filename, const std::vector<std::string>& cod
             size_t pos = l.find("::");
             std::string typeStr = trim(l.substr(0, pos));
             std::string vars = l.substr(pos + 2);
-            PSXType type = (typeStr == "text") ? TYPE_TEXT : TYPE_NUMBER;
+            PSXType type = (typeStr == "text") ? TYPE_TEXT : 
+                           (typeStr == "complex") ? TYPE_COMPLEX : 
+                           (typeStr == "null") ? TYPE_NULL : 
+                           (typeStr == "decimal") ? TYPE_DECIMAL : TYPE_NUMBER;
             std::stringstream ss(vars);
             std::string v;
             while (std::getline(ss, v, ',')) buildTable[trim(v)] = {type, ""};
@@ -93,12 +96,14 @@ void buildNativeBinary(std::string filename, const std::vector<std::string>& cod
 
                         if (buildTable.count(varName)) {
                             Variable var = buildTable[varName];
+                            // HAPUS BAGIAN bool match LAMA DAN GANTI INI:
                             bool match = (targetType == "text" && var.type == TYPE_TEXT) ||
                                          (targetType == "number" && var.type == TYPE_NUMBER) ||
                                          (targetType == "decimal" && var.type == TYPE_DECIMAL) ||
                                          (targetType == "bool" && var.type == TYPE_BOOL) ||
-                                         (targetType == "char" && var.type == TYPE_CHAR);
-
+                                         (targetType == "char" && var.type == TYPE_CHAR) ||
+                                         (targetType == "complex" && var.type == TYPE_COMPLEX) || // Tambahan
+                                         (targetType == "null" && var.type == TYPE_NULL);         // Tambahan
                             if (match) {
                                 textToPrint = "[" + targetType + ": " + (var.value.front() == '"' ? var.value.substr(1, var.value.length()-2) : var.value) + "] ";
                             } else {
