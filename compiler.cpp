@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <sstream>
+#include "compiler/arm64.h" // Backend ARM64 (tidak digunakan di sini, tapi siap jika ingin ditambahkan)
 
 // Implementasi fungsi utilitas (dipindah dari main.cpp)
 std::string trim(const std::string& str) {
@@ -69,6 +70,11 @@ void buildNativeBinary(std::string filename, const std::vector<std::string>& cod
 
     std::vector<uint8_t> machineCode;
     std::map<std::string, Variable> buildTable;
+
+    bool isARM = false;
+    #ifdef __aarch64__
+        isARM = true;
+    #endif
 
     for (const std::string& line : codeLines) {
         std::string l = trim(line);
@@ -139,17 +145,20 @@ void buildNativeBinary(std::string filename, const std::vector<std::string>& cod
                 }
 
                 if (!textToPrint.empty()) {
-                    X86_64::injectPrint(machineCode, textToPrint);
+                    if (isARM) ARM64::injectPrint(machineCode, textToPrint);
+                    else X86_64::injectPrint(machineCode, textToPrint);
                 }
             }
-            X86_64::injectNewline(machineCode);
+            if (isARM) ARM64::injectNewline(machineCode);
+            else X86_64::injectNewline(machineCode);
         }
     }
 
-    X86_64::injectExit(machineCode);
+    if (isARM) ARM64::injectExit(machineCode);
+    else X86_64::injectExit(machineCode);
 
     ELFHeader eh; ProgramHeader ph;
-    eh.e_machine = X86_64::MACHINE_ID; // Set ke 0x3E
+    eh.e_machine = isARM ? ARM64::MACHINE_ID : X86_64::MACHINE_ID; // Dinamis
 
     uint64_t totalSize = sizeof(eh) + sizeof(ph) + machineCode.size();
     ph.p_filesz = totalSize; ph.p_memsz = totalSize;
@@ -160,5 +169,4 @@ void buildNativeBinary(std::string filename, const std::vector<std::string>& cod
     outFile.close();
     
     system(("chmod +x " + outputName).c_str());
-    std::cout << "✅ Compiled to " << outputName << " (x86_64)" << std::endl;
 }
