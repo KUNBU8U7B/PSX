@@ -20,33 +20,34 @@ namespace ARM64 {
     inline void injectPrint(std::vector<uint8_t>& machineCode, const std::string& text) {
         uint32_t len = text.length();
 
-        // 1. mov x0, #1 (stdout) -> 0xd2800020
+        // 1. mov x0, #1 (stdout)
         pushInst(machineCode, 0xd2800020);
         
-        // 2. adr x1, #16 (alamat teks setelah instruksi syscall)
-        // Kita lompat 4 instruksi kedepan untuk ambil data string
+        // 2. adr x1, #16
         pushInst(machineCode, 0x10000081);
 
-        // 3. mov x2, #len (panjang string)
+        // 3. mov x2, #len
         uint32_t mov_x2 = 0xd2800002 | ((len & 0xFFFF) << 5);
         pushInst(machineCode, mov_x2);
 
-        // 4. mov x8, #64 (syscall write di ARM64 adalah 64)
+        // 4. mov x8, #64 (syscall write)
         pushInst(machineCode, 0xd2800808);
 
         // 5. svc #0 (syscall)
         pushInst(machineCode, 0xd4000001);
 
-        // 6. b #len (Lompat melewati data string agar tidak dieksekusi sebagai instruksi)
-        uint32_t branch = 0x14000000 | ((len / 4 + 1) & 0x3FFFFFF);
+        // 6. PERBAIKAN: Hitung lompatan (Branch) melewati data string + padding
+        uint32_t padded_len = (len + 3) & ~3; // Bulatkan panjang ke atas (kelipatan 4)
+        uint32_t offset = (padded_len / 4) + 1; // Hitung berapa banyak blok 4-byte yang harus dilompati
+        uint32_t branch = 0x14000000 | (offset & 0x3FFFFFF);
         pushInst(machineCode, branch);
 
         // 7. Masukkan data string
         for (char c : text) machineCode.push_back((uint8_t)c);
-        // Padding agar instruksi berikutnya tetap sejajar 4 byte (alignment)
+        
+        // Padding agar sejajar 4 byte
         while (machineCode.size() % 4 != 0) machineCode.push_back(0);
     }
-
     inline void injectNewline(std::vector<uint8_t>& machineCode) {
         injectPrint(machineCode, "\n");
     }

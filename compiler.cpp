@@ -72,7 +72,7 @@ void buildNativeBinary(std::string filename, const std::vector<std::string>& cod
     std::map<std::string, Variable> buildTable;
 
     bool isARM = false;
-    #ifdef __aarch64__
+    #if defined(__aarch64__) || defined(_M_ARM64)
         isARM = true;
     #endif
 
