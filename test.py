@@ -4,7 +4,7 @@ import os
 # Konfigurasi
 COMPILER_CMD = ["g++", "main.cpp", "compiler.cpp", "-o", "psx"]
 # Daftar file uji coba kamu (tambahkan semua di sini)
-TEST_FILES = ["1.psx", "3.c", "2.txt", "4.psx"] 
+TEST_FILES = ["test_file/1.psx", "test_file/3.c", "test_file/2.txt", "test_file/4.psx"] 
 
 def run_command(cmd):
     """Menjalankan perintah dan menangkap output stdout & stderr"""

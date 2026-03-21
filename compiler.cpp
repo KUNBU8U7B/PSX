@@ -63,21 +63,20 @@ std::vector<std::string> splitSegments(std::string content) {
     return segments;
 }
 
-void buildNativeBinary(std::string filename, const std::vector<std::string>& codeLines, bool includeEasterEgg) {
+void buildNativeBinary(std::string filename, const std::vector<std::pair<int, std::string>>& codeLines, bool includeEasterEgg) {
     std::string outputName = filename.substr(0, filename.find_last_of('.')) + ".bin";
-    std::ofstream outFile(outputName, std::ios::binary);
-    if (!outFile.is_open()) return;
-
     std::vector<uint8_t> machineCode;
     std::map<std::string, Variable> buildTable;
 
     bool isARM = false;
-    #if defined(__aarch64__) || defined(_M_ARM64)
+    #if defined(__aarch64__) || defined(_M_ARM64) || defined(__arm__)
         isARM = true;
     #endif
 
-    for (const std::string& line : codeLines) {
-        std::string l = trim(line);
+    // TAHAP 1: PEMINDAIAN & VALIDASI (Kompilasi)
+    for (const auto& lineData : codeLines) {
+        int lineNum = lineData.first;
+        std::string l = trim(lineData.second);
 
         // A. Deklarasi
         if (l.find("::") != std::string::npos) {
@@ -99,6 +98,13 @@ void buildNativeBinary(std::string filename, const std::vector<std::string>& cod
             size_t pos = l.find("=");
             std::string varName = trim(l.substr(0, pos));
             std::string val = trim(l.substr(pos + 1));
+            
+            // ERROR CHECK: Variabel belum dideklarasikan
+            if (buildTable.find(varName) == buildTable.end()) {
+                std::cerr << "\n❌ [Compile Error] Baris " << lineNum << ": Variabel '" << varName << "' belum dideklarasikan!\n";
+                std::cerr << "⚠️  Proses dibatalkan. File biner gagal dibuat.\n";
+                return; // Batalkan kompilasi!
+            }
             buildTable[varName] = {detectType(val), val};
         }
         // C. Print Logic
@@ -128,8 +134,14 @@ void buildNativeBinary(std::string filename, const std::vector<std::string>& cod
                             if (match) {
                                 textToPrint = "[" + targetType + ": " + (var.value.front() == '"' ? var.value.substr(1, var.value.length()-2) : var.value) + "] ";
                             } else {
-                                textToPrint = "[TypeError: '" + varName + "' bukan " + targetType + "] ";
+                                std::cerr << "\n❌ [Compile Error] Baris " << lineNum << ": TypeError, '" << varName << "' bukan " << targetType << "!\n";
+                                std::cerr << "⚠️  Proses dibatalkan. File biner gagal dibuat.\n";
+                                return; // Batalkan kompilasi!
                             }
+                        } else {
+                            std::cerr << "\n❌ [Compile Error] Baris " << lineNum << ": Variabel '" << varName << "' tidak ditemukan!\n";
+                            std::cerr << "⚠️  Proses dibatalkan. File biner gagal dibuat.\n";
+                            return; // Batalkan kompilasi!
                         }
                     }
                 }
@@ -154,19 +166,28 @@ void buildNativeBinary(std::string filename, const std::vector<std::string>& cod
         }
     }
 
+    // TAHAP 2: PENULISAN FILE BINER (Hanya dieksekusi jika tidak ada error sama sekali)
     if (isARM) ARM64::injectExit(machineCode);
     else X86_64::injectExit(machineCode);
 
     ELFHeader eh; ProgramHeader ph;
-    eh.e_machine = isARM ? ARM64::MACHINE_ID : X86_64::MACHINE_ID; // Dinamis
+    eh.e_machine = isARM ? ARM64::MACHINE_ID : X86_64::MACHINE_ID; 
 
     uint64_t totalSize = sizeof(eh) + sizeof(ph) + machineCode.size();
     ph.p_filesz = totalSize; ph.p_memsz = totalSize;
     
+    // Buka file HANYA jika sudah dipastikan aman
+    std::ofstream outFile(outputName, std::ios::binary);
+    if (!outFile.is_open()) {
+        std::cerr << "❌ Gagal membuat file: " << outputName << std::endl;
+        return;
+    }
+
     outFile.write(reinterpret_cast<char*>(&eh), sizeof(eh));
     outFile.write(reinterpret_cast<char*>(&ph), sizeof(ph));
     outFile.write(reinterpret_cast<char*>(machineCode.data()), machineCode.size());
     outFile.close();
     
     system(("chmod +x " + outputName).c_str());
+    std::cout << "✅ Compiled to " << outputName << (isARM ? " (ARM64)" : " (x86_64)") << std::endl;
 }
