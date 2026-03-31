@@ -1,0 +1,18 @@
+data type : TEXT NUMBER char DECIMAL BOOL const COMPLEX
+condition : if else switch case default
+loop : for while do
+error handling : try catch
+literal : true false null
+comment : #
+prosedural : func() return
+io : print() input()
+data structure : struct enum
+module : using from
+operator :
+- aritmatika : + - / % * ^
+- bitwise : | & ~
+- logic : || && !
+- assignment : += -= /= %= *= ^= ++ --
+- comparition : == != < > <= >=
+
+symbol : {} [] () ${} : " ' \ , . ? `
