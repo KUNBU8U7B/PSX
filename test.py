@@ -1,70 +1,88 @@
 import subprocess
 import os
 
-# Konfigurasi
-COMPILER_CMD = ["g++", "main.cpp", "compiler.cpp", "-o", "psx"]
-# Daftar file uji coba kamu (tambahkan semua di sini)
-TEST_FILES = ["test_file/1.psx", "test_file/3.c", "test_file/2.txt", "test_file/4.psx"] 
+# Konfigurasi WSL
+# Path Windows: C:\Users\Pongo\Documents\CODING\C
+# Path WSL: /mnt/c/Users/Pongo/Documents/CODING/C
+BASE_PATH_WSL = "/mnt/c/Users/Pongo/Documents/CODING/C"
 
-def run_command(cmd):
-    """Menjalankan perintah dan menangkap output stdout & stderr"""
-    result = subprocess.run(cmd, capture_output=True, text=True)
+def run_wsl(cmd_list):
+    """Menjalankan perintah di dalam WSL dengan encoding UTF-8"""
+    wsl_cmd = ["wsl"] + cmd_list
+    result = subprocess.run(wsl_cmd, capture_output=True, text=True, encoding='utf-8', errors='replace')
     return result
 
-def main():
-    print("--- 🚀 PSX UNIVERSAL TESTER ---")
+def safe_print(text):
+    """Mencetak teks ke konsol dengan menangani karakter yang tidak didukung"""
+    try:
+        print(text)
+    except UnicodeEncodeError:
+        print(text.encode('ascii', 'replace').decode('ascii'))
 
-    # 1. Build Compiler Utama
-    print(f"[*] Menyiapkan compiler PSX...", end=" ", flush=True)
-    compile_res = run_command(COMPILER_CMD)
+def main():
+    print("--- PSX UNIVERSAL TESTER (WSL MODE) ---")
+
+    # 1. Build Compiler Utama di WSL
+    print(f"[*] Menyiapkan compiler PSX di WSL...", end=" ", flush=True)
+    compile_cmd = ["g++", f"{BASE_PATH_WSL}/main.cpp", f"{BASE_PATH_WSL}/compiler.cpp", "-o", f"{BASE_PATH_WSL}/psx"]
+    compile_res = run_wsl(compile_cmd)
     if compile_res.returncode != 0:
-        print("❌ GAGAL BENTUK")
+        print("[X] GAGAL BUILD")
         print(compile_res.stderr)
         return
-    print("✅ SIAP\n")
+    print("[V] SIAP\n")
 
-    # 2. Proses Setiap File
-    for file_name in TEST_FILES:
-        if not os.path.exists(file_name):
-            print(f"[!] Lewati: {file_name} (File tidak ditemukan)")
-            continue
+    # 2. Daftar file uji coba
+    test_dir = "test_file"
+    test_files = [f for f in os.listdir(test_dir) if f.endswith(('.psx', '.c', '.txt'))]
+    test_files.sort()
 
+    for file_name in test_files:
+        full_path_win = os.path.abspath(os.path.join(test_dir, file_name))
+        # Konversi path Windows ke WSL path
+        file_path_wsl = f"{BASE_PATH_WSL}/test_file/{file_name}"
+        
         ext = os.path.splitext(file_name)[1].upper()
         print(f"{'='*10} MENGUJI: {file_name} ({ext}) {'='*10}")
 
-        # JALANKAN INTERPRETER (Selalu diperlihatkan outputnya)
-        print(f"[*] Output Interpreter:")
-        res = run_command(["./psx", file_name])
+        # JALANKAN INTERPRETER
+        safe_print(f"[*] Output Interpreter:")
+        res = run_wsl([f"{BASE_PATH_WSL}/psx", file_path_wsl])
         
-        # Tampilkan output standar jika ada
         if res.stdout:
-            print(res.stdout.strip())
+            safe_print(res.stdout.strip())
         
-        # Tampilkan error jika ada (Misal: lupa 'use psx' di file .c)
         if res.stderr:
-            print(f"⚠️  Pesan Sistem/Error:\n{res.stderr.strip()}")
+            safe_print(f"(!) Pesan Sistem/Error:\n{res.stderr.strip()}")
 
         # 3. CEK LOGIKA KOMPILASI (Hanya jika ada !compile)
         try:
-            with open(file_name, 'r') as f:
+            with open(full_path_win, 'r') as f:
                 content = f.read()
                 if "!compile" in content:
                     print(f"\n[*] Mendeteksi '!compile', mengecek biner...")
-                    bin_name = os.path.splitext(file_name)[0] + ".bin"
+                    bin_name_wsl = f"{BASE_PATH_WSL}/test_file/{os.path.splitext(file_name)[0]}.bin"
                     
-                    if os.path.exists(bin_name):
-                        print(f"✅ Biner '{bin_name}' berhasil dibuat.")
-                        print(f"[*] Menjalankan hasil biner:")
-                        bin_res = run_command([f"./{bin_name}"])
-                        print(f"   > {bin_res.stdout.strip()}")
+                    # Cek keberadaan file di WSL (via ls)
+                    check_bin = run_wsl(["ls", bin_name_wsl])
+                    if check_bin.returncode == 0:
+                        safe_print(f"[V] Biner berhasil dibuat di WSL.")
+                        safe_print(f"[*] Menjalankan hasil biner di WSL:")
+                        # Pastikan executable
+                        run_wsl(["chmod", "+x", bin_name_wsl])
+                        bin_res = run_wsl([bin_name_wsl])
+                        if bin_res.stdout:
+                            safe_print(f"   > {bin_res.stdout.strip()}")
+                        if bin_res.stderr:
+                            safe_print(f"   ! Error Biner: {bin_res.stderr.strip()}")
                     else:
-                        print(f"❌ Gagal membuat biner.")
+                        safe_print(f"[X] Gagal membuat biner (Biner tidak ditemukan).")
         except Exception as e:
-            print(f"❌ Gagal membaca file: {e}")
+            safe_print(f"[X] Gagal memproses file: {e}")
             
         print(f"{'='*40}\n")
 
-    print("--- ✅ Semua Uji Coba Selesai ---")
+    print("--- Semua Uji Coba Selesai ---")
 
 if __name__ == "__main__":
     main()

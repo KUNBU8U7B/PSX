@@ -1,0 +1,4 @@
+use psx
+msg = "Kompilasi Berhasil"
+print msg
+!compile

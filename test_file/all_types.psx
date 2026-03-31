@@ -1,0 +1,23 @@
+use psx
+# Angka & Desimal
+a = 100
+b = 3.14
+# Text & Char
+c = "Bahasa PSX"
+d = 'Z'
+# Boolean
+e = true
+f = false
+# Complex
+g = 3+4j
+# Null
+h = none
+
+print "Number: " a
+print "Decimal: " b
+print "Text: " c
+print "Char: " d
+print "Bool True: " e
+print "Bool False: " f
+print "Complex: " g
+print "Null: " h

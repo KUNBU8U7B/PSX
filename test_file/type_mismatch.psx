@@ -1,0 +1,13 @@
+use psx
+number:: n
+text:: t
+bool:: b
+
+# Ini harusnya memicu error di interpreter jika diimplementasikan dengan benar
+print "Mencoba mengisi number dengan text..."
+n = "bukan angka" # Harusnya TypeError
+print "Nilai n: " n
+
+print "Mencoba mengisi text dengan decimal..."
+t = 12.34 # Harusnya TypeError
+print "Nilai t: " t

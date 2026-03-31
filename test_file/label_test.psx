@@ -1,0 +1,13 @@
+use psx
+skor = 100
+nama = "Darma"
+z = 3+5j
+status = none
+
+print "Cek Skor (number): ", Label(number, skor)
+print "Cek Nama (text): ", Label(text, nama)
+print "Cek Kompleks (complex): ", Label(complex, z)
+print "Cek Status (null): ", Label(null, status)
+
+# Skenario Error
+print "Cek Nama sebagai number (Harusnya Error): ", Label(number, nama)

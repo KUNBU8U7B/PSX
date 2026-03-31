@@ -1,0 +1,7 @@
+use psx
+# Komentar di baris baru
+x = 10 # Komentar di akhir baris
+print "Nilai x: " x # Komentar lagi
+y = "String dengan # di dalamnya"
+print y
+# print "Ini tidak akan dicetak"

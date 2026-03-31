@@ -1,0 +1,6 @@
+use psx
+x = 10
+y = "Halo PSX"
+print "Variabel x: " x
+print "Variabel y: " y
+!compile
